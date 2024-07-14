@@ -68,7 +68,7 @@
             max-width: 600px;
             text-align: left;
             display: flex;
-            justify-content: space-between;
+            justify-content: space-around;
         }
 
         .subject-column {
@@ -83,6 +83,7 @@
             margin-bottom: 10px;
             text-align: center;
             color: #666;
+            display: none; /* Inicialmente oculto */
         }
 
         .subject-item {
@@ -117,8 +118,8 @@
         .progress-bar {
             background-color: #e0e0e0;
             border-radius: 10px;
-            height: 30px;
-            width: 80%;
+            height: 20px;
+            width: 70%;
             max-width: 400px;
             margin-right: 10px;
             box-shadow: inset 0 1px 3px rgba(0, 0, 0, .2);
@@ -134,7 +135,7 @@
         }
 
         .graduation-cap {
-            height: 50px;
+            height: 30px;
             margin-left: 10px;
             vertical-align: middle;
         }
@@ -142,11 +143,13 @@
         .progress-text {
             margin-top: 10px;
             color: #666;
+            display: none; /* Inicialmente oculto */
         }
 
         .remaining-subjects {
             margin-top: 10px;
             color: #666;
+            display: none; /* Inicialmente oculto */
         }
 
         .btn {
@@ -170,8 +173,8 @@
         <h1>Progresso Acadêmico</h1>
         <input type="file" id="fileInput" accept=".xlsx">
         <div class="search-container" id="searchContainer">
-            <input type="text" id="searchInput" placeholder="Pesquisar matéria...">
-            <button class="btn" onclick="searchSubject()">Pesquisar</button>
+            <input type="text" id="searchInput" placeholder="Pesquisar matéria">
+            <button class="btn" id="searchButton">Pesquisar</button>
         </div>
         <div class="subject-list" id="subjectList">
             <div class="subject-column">
@@ -199,6 +202,7 @@
         let subjects = [];
 
         document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+        document.getElementById('searchButton').addEventListener('click', handleSearch);
 
         function handleFileUpload(event) {
             const file = event.target.files[0];
@@ -214,28 +218,49 @@
                         type: (row[1] && row[1].toLowerCase() === 'obrigatória') ? 'mandatory' : 'elective',
                         completed: false
                     })).filter(subject => subject.name.trim() !== '');
+
+                    document.getElementById('searchContainer').style.display = 'flex'; // Mostra a barra de pesquisa
                     document.getElementById('subjectList').style.display = 'flex'; // Mostra a lista de matérias
                     document.getElementById('progressBarContainer').style.display = 'block'; // Mostra a barra de progresso
-                    document.getElementById('searchContainer').style.display = 'flex'; // Mostra a barra de pesquisa
+                    document.getElementById('progressText').style.display = 'block'; // Mostra o texto de progresso
+                    document.getElementById('remainingSubjects').style.display = 'block'; // Mostra o texto de matérias restantes
+                    document.getElementById('mandatoryTitle').style.display = 'block'; // Mostra o título das matérias obrigatórias
+                    document.getElementById('electiveTitle').style.display = 'block'; // Mostra o título das matérias optativas
+
                     updateSubjectList();
                 };
                 reader.readAsArrayBuffer(file);
             }
         }
 
-        function updateSubjectList() {
+        function handleSearch() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filteredSubjects = subjects.filter(subject => subject.name.toLowerCase().includes(searchTerm));
+            updateSubjectList(filteredSubjects);
+        }
+
+        function updateSubjectList(filteredSubjects = subjects) {
             const mandatorySubjectsDiv = document.getElementById('mandatorySubjects');
             const electiveSubjectsDiv = document.getElementById('electiveSubjects');
             mandatorySubjectsDiv.innerHTML = '';
             electiveSubjectsDiv.innerHTML = '';
 
-            subjects.forEach(subject => {
+            filteredSubjects.forEach(subject => {
                 const subjectItem = document.createElement('div');
                 subjectItem.className = `subject-item ${subject.completed ? 'completed' : ''}`;
-                subjectItem.innerHTML = `
-                    <span>${subject.name}</span>
-                    <input type="checkbox" class="subject-checkbox" ${subject.completed ? 'checked' : ''} onchange="toggleSubject('${subject.name}')">
-                `;
+
+                const subjectText = document.createElement('span');
+                subjectText.textContent = subject.name;
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'subject-checkbox';
+                checkbox.checked = subject.completed;
+                checkbox.onchange = () => toggleCompletion(subjects.findIndex(item => item.name === subject.name));
+
+                subjectItem.appendChild(subjectText);
+                subjectItem.appendChild(checkbox);
+
                 if (subject.type === 'mandatory') {
                     mandatorySubjectsDiv.appendChild(subjectItem);
                 } else {
@@ -246,54 +271,33 @@
             updateProgress();
         }
 
-        function toggleSubject(subjectName) {
-            const subject = subjects.find(subj => subj.name === subjectName);
-            if (subject) {
-                subject.completed = !subject.completed;
-                updateSubjectList();
-            }
+        function toggleCompletion(index) {
+            subjects[index].completed = !subjects[index].completed;
+            updateSubjectList();
         }
 
         function updateProgress() {
             const totalSubjects = subjects.length;
-            const completedSubjects = subjects.filter(subj => subj.completed).length;
-            const percentage = (completedSubjects / totalSubjects) * 100;
+            const completedSubjects = subjects.filter(subject => subject.completed).length;
+            const progress = totalSubjects > 0 ? (completedSubjects / totalSubjects) * 100 : 0;
+            const progressText = progress.toFixed(1) + '% concluído';
+            const remainingSubjectsText = `${totalSubjects - completedSubjects} matérias restantes (${subjects.filter(subject => subject.type === 'mandatory' && !subject.completed).length} obrigatórias, ${subjects.filter(subject => subject.type === 'elective' && !subject.completed).length} optativas)`;
 
-            document.getElementById('progressBarInner').style.width = `${percentage}%`;
-            document.getElementById('progressText').textContent = `${percentage.toFixed(1)}% concluído`;
-
-            const remainingMandatory = subjects.filter(subj => subj.type === 'mandatory' && !subj.completed).length;
-            const remainingElective = subjects.filter(subj => subj.type === 'elective' && !subj.completed).length;
-            document.getElementById('remainingSubjects').textContent = `${remainingMandatory + remainingElective} matérias restantes (${remainingMandatory} obrigatórias, ${remainingElective} optativas)`;
+            document.getElementById('progressBarInner').style.width = progress + '%';
+            document.getElementById('progressText').textContent = progressText;
+            document.getElementById('remainingSubjects').textContent = remainingSubjectsText;
         }
 
         function clearSubjects() {
-            subjects.forEach(subject => subject.completed = false);
-            updateSubjectList();
-        }
-
-        function searchSubject() {
-            const searchQuery = document.getElementById('searchInput').value.toLowerCase();
-            const filteredSubjects = subjects.filter(subj => subj.name.toLowerCase().includes(searchQuery));
-            
-            const mandatorySubjectsDiv = document.getElementById('mandatorySubjects');
-            const electiveSubjectsDiv = document.getElementById('electiveSubjects');
-            mandatorySubjectsDiv.innerHTML = '';
-            electiveSubjectsDiv.innerHTML = '';
-
-            filteredSubjects.forEach(subject => {
-                const subjectItem = document.createElement('div');
-                subjectItem.className = `subject-item ${subject.completed ? 'completed' : ''}`;
-                subjectItem.innerHTML = `
-                    <span>${subject.name}</span>
-                    <input type="checkbox" class="subject-checkbox" ${subject.completed ? 'checked' : ''} onchange="toggleSubject('${subject.name}')">
-                `;
-                if (subject.type === 'mandatory') {
-                    mandatorySubjectsDiv.appendChild(subjectItem);
-                } else {
-                    electiveSubjectsDiv.appendChild(subjectItem);
-                }
-            });
+            subjects = [];
+            document.getElementById('fileInput').value = '';
+            document.getElementById('searchContainer').style.display = 'none'; // Oculta a barra de pesquisa
+            document.getElementById('subjectList').style.display = 'none'; // Oculta a lista de matérias
+            document.getElementById('progressBarContainer').style.display = 'none'; // Oculta a barra de progresso
+            document.getElementById('progressText').style.display = 'none'; // Oculta o texto de progresso
+            document.getElementById('remainingSubjects').style.display = 'none'; // Oculta o texto de matérias restantes
+            document.getElementById('mandatoryTitle').style.display = 'none'; // Oculta o título das matérias obrigatórias
+            document.getElementById('electiveTitle').style.display = 'none'; // Oculta o título das matérias optativas
         }
     </script>
 </body>
